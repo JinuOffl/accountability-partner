@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 
-const SettingsModal = ({ user, habits, onClose, onEditHabit, onDeleteHabit, onUpdateUser }) => {
+const SettingsModal = ({ user, habits, authUser, onClose, onEditHabit, onDeleteHabit, onUpdateUser }) => {
   const userPayload = user || { upiId: '', name: 'You' };
   
   const [editingHabit, setEditingHabit] = useState(null);
   const [upiId, setUpiId] = useState(userPayload.upiId || '');
+  const [showFriendLink, setShowFriendLink] = useState(false);
 
   const handleEditClick = (habit) => {
     setEditingHabit({ ...habit });
@@ -32,13 +33,15 @@ const SettingsModal = ({ user, habits, onClose, onEditHabit, onDeleteHabit, onUp
     }
   };
 
+  const friendShareLink = authUser ? `${window.location.origin}?friendId=${authUser.uid}` : '';
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px'}}>
         <h2>Settings</h2>
         
         <div style={{marginBottom: '30px'}}>
-          <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>Payment UPI ID</h3>
+          <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>💳 Payment UPI ID</h3>
           <div style={{display: 'flex', gap: '8px'}}>
             <input
               type="text"
@@ -51,6 +54,45 @@ const SettingsModal = ({ user, habits, onClose, onEditHabit, onDeleteHabit, onUp
               Update
             </button>
           </div>
+          <small style={{color: '#666', fontSize: '12px', marginTop: '8px', display: 'block'}}>
+            This is your UPI ID where friends send penalty payments
+          </small>
+        </div>
+
+        <div style={{marginBottom: '30px'}}>
+          <h3 style={{fontSize: '16px', fontWeight: '600', marginBottom: '12px'}}>👥 Share with Friend</h3>
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setShowFriendLink(!showFriendLink)}
+            style={{width: '100%'}}
+          >
+            {showFriendLink ? 'Hide' : 'Show'} Friend Share Link
+          </button>
+          
+          {showFriendLink && (
+            <div style={{
+              background: '#f0f0f0',
+              padding: '12px',
+              borderRadius: '6px',
+              marginTop: '12px',
+              wordBreak: 'break-all'
+            }}>
+              <small style={{color: '#666', display: 'block', marginBottom: '8px'}}>
+                Share this link with your friend so they can view your progress:
+              </small>
+              <code style={{fontSize: '12px', color: '#000'}}>{friendShareLink}</code>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  navigator.clipboard.writeText(friendShareLink);
+                  alert('Link copied to clipboard!');
+                }}
+                style={{marginTop: '8px', width: '100%', padding: '6px'}}
+              >
+                📋 Copy Link
+              </button>
+            </div>
+          )}
         </div>
 
         <div>
@@ -80,9 +122,11 @@ const SettingsModal = ({ user, habits, onClose, onEditHabit, onDeleteHabit, onUp
                   <div style={{display: 'flex', gap: '8px'}}>
                     <input
                       type="number"
-                      value={editingHabit.penaltyAmount || 0}
-                      onChange={(e) => setEditingHabit({...editingHabit, penaltyAmount: parseInt(e.target.value) || 0})}
-                      placeholder="Penalty"
+                      value={editingHabit.penaltyAmount || 10}
+                      onChange={(e) => setEditingHabit({...editingHabit, penaltyAmount: parseInt(e.target.value) || 10})}
+                      placeholder="Penalty (min 10)"
+                      min="10"
+                      step="10"
                       style={{flex: 1, padding: '8px'}}
                     />
                     <button className="btn btn-primary" style={{padding: '8px 16px'}} onClick={handleSaveEdit}>
@@ -98,7 +142,7 @@ const SettingsModal = ({ user, habits, onClose, onEditHabit, onDeleteHabit, onUp
                   <div>
                     <div style={{fontWeight: '600', marginBottom: '4px'}}>{habit.name}</div>
                     <div style={{fontSize: '13px', color: '#666'}}>
-                      ₹{(habit.penaltyAmount || 0).toLocaleString()} • {habit.type}
+                      ₹{(habit.penaltyAmount || 10).toLocaleString()} • {habit.type}
                     </div>
                   </div>
                   <div style={{display: 'flex', gap: '6px'}}>

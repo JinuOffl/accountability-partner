@@ -8,7 +8,8 @@ import {
   query,
   where,
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
@@ -16,23 +17,15 @@ import { db } from '../firebaseConfig';
 export const createUser = async (userId, email) => {
   try {
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
+    await setDoc(userRef, {
+      id: userId,
       email,
+      name: 'You',
       createdAt: serverTimestamp(),
       totalPenalty: 0,
       upiId: '',
       friendId: null
-    }).catch(() => {
-      // If doc doesn't exist, create it
-      return updateDoc(userRef, {
-        id: userId,
-        email,
-        createdAt: serverTimestamp(),
-        totalPenalty: 0,
-        upiId: '',
-        friendId: null
-      });
-    });
+    }, { merge: true });
   } catch (error) {
     console.error('Error creating user:', error);
   }
@@ -41,12 +34,11 @@ export const createUser = async (userId, email) => {
 // Get user data
 export const getUser = async (userId) => {
   try {
-    const userRef = doc(db, 'users', userId);
     const habitsSnapshot = await getDocs(query(
       collection(db, 'habits'),
       where('userId', '==', userId)
     ));
-
+    
     const habits = habitsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -98,7 +90,7 @@ export const deleteHabit = async (habitId) => {
   }
 };
 
-// Toggle habit completion
+// Toggle habit completion - RETURNS NEW STATE
 export const toggleHabitCompletion = async (userId, habitId, date) => {
   try {
     const trackingRef = collection(db, 'tracking');
@@ -108,9 +100,10 @@ export const toggleHabitCompletion = async (userId, habitId, date) => {
       where('habitId', '==', habitId),
       where('date', '==', date)
     );
-
+    
     const snapshot = await getDocs(q);
-
+    let newState = true;
+    
     if (snapshot.empty) {
       // Create new tracking entry
       await addDoc(trackingRef, {
@@ -120,16 +113,46 @@ export const toggleHabitCompletion = async (userId, habitId, date) => {
         completed: true,
         createdAt: serverTimestamp()
       });
+      newState = true;
     } else {
       // Toggle existing entry
       const docId = snapshot.docs[0].id;
       const currentValue = snapshot.docs[0].data().completed;
+      newState = !currentValue;
+      
       await updateDoc(doc(db, 'tracking', docId), {
-        completed: !currentValue
+        completed: newState
       });
     }
+    
+    return newState;
   } catch (error) {
     console.error('Error toggling completion:', error);
+    return false;
+  }
+};
+
+// Get ALL tracking data for user
+export const getAllTrackingData = async (userId) => {
+  try {
+    const q = query(
+      collection(db, 'tracking'),
+      where('userId', '==', userId)
+    );
+    
+    const snapshot = await getDocs(q);
+    const data = {};
+    
+    snapshot.docs.forEach(doc => {
+      const trackData = doc.data();
+      const key = `${trackData.habitId}_${trackData.date}`;
+      data[key] = trackData.completed;
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('Error getting tracking data:', error);
+    return {};
   }
 };
 
@@ -143,14 +166,14 @@ export const getTrackingData = async (userId, habitId, startDate, endDate) => {
       where('date', '>=', startDate),
       where('date', '<=', endDate)
     );
-
+    
     const snapshot = await getDocs(q);
     const data = {};
-
+    
     snapshot.docs.forEach(doc => {
       data[doc.data().date] = doc.data().completed;
     });
-
+    
     return data;
   } catch (error) {
     console.error('Error getting tracking data:', error);
@@ -170,6 +193,30 @@ export const updateUserUPI = async (userId, upiId) => {
   }
 };
 
+// Get friend's data by friend ID or email
+export const getFriendData = async (friendId) => {
+  try {
+    const habitsSnapshot = await getDocs(query(
+      collection(db, 'habits'),
+      where('userId', '==', friendId)
+    ));
+    
+    const habits = habitsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    return {
+      id: friendId,
+      habits,
+      totalPenalty: 0
+    };
+  } catch (error) {
+    console.error('Error getting friend data:', error);
+    return null;
+  }
+};
+
 export default {
   createUser,
   getUser,
@@ -177,6 +224,8 @@ export default {
   updateHabit,
   deleteHabit,
   toggleHabitCompletion,
+  getAllTrackingData,
   getTrackingData,
-  updateUserUPI
+  updateUserUPI,
+  getFriendData
 };

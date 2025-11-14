@@ -10,7 +10,7 @@ const HabitTable = ({ user, habits, last7DaysData, onHabitClick, readOnly }) => 
   return (
     <div className="habits-section">
       <div className="section-header">
-        <h2>{userPayload.name}'s Bad Habits</h2>
+        <h2>{userPayload.name}'s Habits</h2>
         <div className="total-penalty">
           Total Penalties: ₹{(userPayload.totalPenalty || 0).toLocaleString()}
         </div>
@@ -51,15 +51,30 @@ const HabitTable = ({ user, habits, last7DaysData, onHabitClick, readOnly }) => 
                   <td>
                     <div className="last-7-days">
                       {last7.map((day, idx) => (
-                        <div key={idx} style={{textAlign: 'center'}}>
-                          <input
-                            type="checkbox"
-                            className="day-checkbox"
-                            checked={day.completed || false}
-                            onChange={() => !readOnly && onHabitClick(habit.id, day.date)}
-                            disabled={readOnly}
-                            title={day.date}
-                          />
+                        <div key={idx} style={{textAlign: 'center', cursor: readOnly ? 'default' : 'pointer'}}>
+                          <div
+                            className="day-checkbox-visual"
+                            onClick={() => !readOnly && onHabitClick(habit.id, day.date)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '32px',
+                              height: '32px',
+                              border: '2px solid #000',
+                              borderRadius: '4px',
+                              background: day.completed ? '#10b981' : '#fff',
+                              color: day.completed ? '#fff' : '#000',
+                              fontWeight: 'bold',
+                              fontSize: '18px',
+                              cursor: readOnly ? 'default' : 'pointer',
+                              userSelect: 'none',
+                              transition: 'all 0.2s ease'
+                            }}
+                            title={`${day.date}: ${day.completed ? 'Done' : 'Pending'}`}
+                          >
+                            {day.completed ? '✓' : '✗'}
+                          </div>
                           <div className="day-label">
                             {new Date(day.date + 'T00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </div>

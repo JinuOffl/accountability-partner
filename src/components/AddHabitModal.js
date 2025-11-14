@@ -4,7 +4,7 @@ const AddHabitModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     type: 'bad',
-    penaltyAmount: 500,
+    penaltyAmount: 10,
     gracePeriod: 0
   });
   const [error, setError] = useState('');
@@ -26,8 +26,8 @@ const AddHabitModal = ({ onClose, onSave }) => {
       setError('Habit name is required');
       return;
     }
-    if (formData.penaltyAmount < 0) {
-      setError('Penalty amount must be positive');
+    if (formData.penaltyAmount < 10) {
+      setError('Penalty amount must be at least ₹10');
       return;
     }
     onSave(formData);
@@ -37,10 +37,10 @@ const AddHabitModal = ({ onClose, onSave }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Add Bad Habit</h2>
-
+        <h2>Add Habit</h2>
+        
         {error && <div style={{color: '#ef4444', marginBottom: '12px', fontSize: '14px'}}>{error}</div>}
-
+        
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Habit Name *</label>
@@ -63,14 +63,14 @@ const AddHabitModal = ({ onClose, onSave }) => {
           </div>
 
           <div className="form-group">
-            <label>Penalty Amount (₹) *</label>
+            <label>Penalty Amount (₹) * (increments of 10)</label>
             <input
               type="number"
               name="penaltyAmount"
               value={formData.penaltyAmount}
               onChange={handleChange}
-              min="0"
-              step="50"
+              min="10"
+              step="10"
               required
             />
           </div>

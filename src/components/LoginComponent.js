@@ -25,7 +25,7 @@ const LoginComponent = ({ user, onAuthStateChange }) => {
   if (!user) {
     return (
       <div style={{textAlign: 'center', padding: '60px 20px'}}>
-        <h1 style={{marginBottom: '20px'}}>Bad Habit Tracker</h1>
+        <h1 style={{marginBottom: '20px'}}>Accountability Partnerr</h1>
         <p style={{color: '#666', marginBottom: '30px'}}>
           Track your bad habits and stay accountable
         </p>

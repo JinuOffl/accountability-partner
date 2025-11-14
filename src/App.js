@@ -25,9 +25,10 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setAuthUser(currentUser);
       if (currentUser) {
-        // Initialize user in Firestore
         storage.createUser(currentUser.uid, currentUser.email);
         loadUserData(currentUser.uid);
+        // Load all tracking data
+        loadTrackingData(currentUser.uid);
       }
       setLoading(false);
     });
@@ -41,7 +42,7 @@ function App() {
       if (userData) {
         setUser({
           id: userId,
-          name: 'You',
+          name: userData.name || 'You',
           totalPenalty: userData.totalPenalty || 0,
           upiId: userData.upiId || '',
           ...userData
@@ -50,6 +51,15 @@ function App() {
       }
     } catch (error) {
       console.error('Error loading user:', error);
+    }
+  };
+
+  const loadTrackingData = async (userId) => {
+    try {
+      const trackingData = await storage.getAllTrackingData(userId);
+      setTracking(trackingData);
+    } catch (error) {
+      console.error('Error loading tracking:', error);
     }
   };
 
@@ -74,10 +84,15 @@ function App() {
 
   const handleHabitClick = async (habitId, date) => {
     if (authUser) {
-      await storage.toggleHabitCompletion(authUser.uid, habitId, date);
-      // Reload tracking data
-      const trackingData = await storage.getTrackingData(authUser.uid, habitId, date, date);
-      setTracking({...tracking, ...trackingData});
+      // Toggle and get the new state
+      const newState = await storage.toggleHabitCompletion(authUser.uid, habitId, date);
+      
+      // Update tracking state immediately for visual feedback
+      const key = `${habitId}_${date}`;
+      setTracking({
+        ...tracking,
+        [key]: newState
+      });
     }
   };
 
@@ -98,10 +113,11 @@ function App() {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
+      const key = `${habitId}_${dateStr}`;
       
       days.push({
         date: dateStr,
-        completed: tracking[`${habitId}_${dateStr}`] || false
+        completed: tracking[key] || false
       });
     }
     
@@ -119,8 +135,9 @@ function App() {
       
       let count = 0;
       habits.forEach(habit => {
-        if (habit.type === type && tracking[`${habit.id}_${dateStr}`]) {
-          count++;
+        if (habit.type === type) {
+          const key = `${habit.id}_${dateStr}`;
+          if (tracking[key]) count++;
         }
       });
       
@@ -128,6 +145,23 @@ function App() {
     }
     
     return heatmap;
+  };
+
+  // Calculate total penalties
+  const calculateTotalPenalties = () => {
+    let total = 0;
+    const today = new Date().toISOString().split('T')[0];
+    
+    habits.forEach(habit => {
+      if (habit.type === 'bad') {
+        const key = `${habit.id}_${today}`;
+        if (tracking[key]) {
+          total += habit.penaltyAmount || 0;
+        }
+      }
+    });
+    
+    return total;
   };
 
   if (loading) {
@@ -142,7 +176,6 @@ function App() {
     );
   }
 
-  // Safe null checks for user
   if (!user) {
     return <div style={{padding: '40px', textAlign: 'center'}}>Setting up your profile...</div>;
   }
@@ -152,10 +185,14 @@ function App() {
     last7DaysData[habit.id] = getLast7Days(habit.id);
   });
 
+  // Show ALL habits (both bad and good)
+  const allHabits = habits;
   const badHabits = habits.filter(h => h.type === 'bad');
   const goodHabits = habits.filter(h => h.type === 'good');
+  
+  // Calculate actual penalties
+  const totalPenalties = calculateTotalPenalties();
 
-  // Safe null check for friendUser
   const friendUser = {
     name: 'Friend',
     upiId: user && user.upiId ? user.upiId : 'friend@upi'
@@ -164,20 +201,20 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>📱 Bad Habit Tracker</h1>
+        <h1>Accountability Partner</h1>
         {authUser && <LoginComponent user={authUser} onAuthStateChange={setAuthUser} />}
       </header>
 
       <div className="main-content">
-        {/* Bad Habits Table */}
+        {/* ALL Habits Table */}
         <HabitTable
           user={{
             id: user.id || '',
             name: user.name || 'You',
-            totalPenalty: user.totalPenalty || 0,
+            totalPenalty: totalPenalties,
             upiId: user.upiId || ''
           }}
-          habits={badHabits}
+          habits={allHabits}
           last7DaysData={last7DaysData}
           onHabitClick={handleHabitClick}
           readOnly={false}
@@ -203,9 +240,9 @@ function App() {
           </div>
         )}
 
-        {badHabits.length === 0 && (
+        {allHabits.length === 0 && (
           <div className="empty-state">
-            <p>No bad habits tracked yet. Click "➕ Add Habit" to get started!</p>
+            <p>No habits tracked yet. Click "➕ Add Habit" to get started!</p>
           </div>
         )}
       </div>
@@ -215,9 +252,9 @@ function App() {
         <button className="btn btn-primary" onClick={() => setShowSettings(true)}>
           ⚙️ Settings
         </button>
-        {user && user.totalPenalty && user.totalPenalty > 0 && (
+        {user && user.upiId && user.upiId.trim() && totalPenalties > 0 && (
           <button className="btn btn-primary" onClick={() => setShowPayment(true)}>
-            💳 Pay (₹{(user.totalPenalty || 0).toLocaleString()})
+            💳 Pay (₹{totalPenalties.toLocaleString()})
           </button>
         )}
         <button className="btn btn-primary" style={{background: '#10b981'}} onClick={() => setShowAddHabit(true)}>
@@ -237,6 +274,7 @@ function App() {
         <SettingsModal
           user={user}
           habits={habits}
+          authUser={authUser}
           onClose={() => setShowSettings(false)}
           onEditHabit={handleEditHabit}
           onDeleteHabit={handleDeleteHabit}
@@ -246,7 +284,7 @@ function App() {
 
       {showPayment && user && (
         <PaymentModal
-          user={user}
+          user={{...user, totalPenalty: totalPenalties}}
           friendUser={friendUser}
           onClose={() => setShowPayment(false)}
         />
